@@ -33,16 +33,16 @@ class InitialColumnProgNN(object):
     def __init__(self, topology, activations, session, dtype=tf.float64):
         n_input = topology[0]
         # Layers in network.
-        L = len(topology) - 1 # n_hidden_layer?
+        L = len(topology) - 1 # n_layers except input layer
         self.session = session
         self.L = L
-        self.topology = topology
-        self.o_n = tf.placeholder(dtype,shape=[None, n_input])
+        self.topology = topology # list of layer output dims
+        self.o_n = tf.placeholder(dtype,shape=[None, n_input]) # output of input layer
 
-        self.W = []
-        self.b =[]
-        self.h = [self.o_n]
-        params = []
+        self.W = [] # weights in each layer
+        self.b =[] # biases in each layer
+        self.h = [self.o_n] # activation output in each layer
+        params = [] # store all Ws and bs, will be modified when W and b is trained i think
         for k in range(L):
             shape = topology[k:k+2]
             self.W.append(weight_variable(shape))
@@ -70,18 +70,18 @@ class ExtensibleColumnProgNN(object):
 
     def __init__(self, topology, activations, session, prev_columns, dtype=tf.float64):
         n_input = topology[0]
-        self.topology = topology
+        self.topology = topology # list of layer output dims
         self.session = session
         width = len(prev_columns)
         # Layers in network. First value is n_input, so it doesn't count.
-        L = len(topology) -1
+        L = len(topology) -1 # n_layers except input layer
         self.L = L
         self.prev_columns = prev_columns
 
         # Doesn't work if the columns aren't the same height.
         assert all([self.L == x.L for x in prev_columns])
 
-        self.o_n = tf.placeholder(dtype, shape=[None, n_input])
+        self.o_n = tf.placeholder(dtype, shape=[None, n_input]) # output of input layer
 
         self.W = [[]] * L
         self.b = [[]] * L
