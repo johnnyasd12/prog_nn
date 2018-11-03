@@ -33,7 +33,7 @@ class InitialColumnProgNN(object):
     def __init__(self, topology, activations, session, dtype=tf.float64):
         n_input = topology[0]
         # Layers in network.
-        L = len(topology) - 1
+        L = len(topology) - 1 # n_hidden_layer?
         self.session = session
         self.L = L
         self.topology = topology
