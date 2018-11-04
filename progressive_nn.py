@@ -3,16 +3,7 @@ import numpy as np
 from pprint import pprint
 # from param_collection import ParamCollection
 
-def weight_fc(shape,stddev=0.1,initial=None):
-    if initial is None:
-        initial = tf.truncated_normal(shape,stddev=stddev,dtype=tf.float64)
-    return initial
 
-def bias_fc(shape,init_bias=0.1,initial=None):
-    if initial is None:
-        initial = tf.constant(init_bias,shape=shape,dtype=tf.float64)
-        initial = tf.Variable(initial)
-    return initial
 
 class InitialColumnProgNN(object):
 
@@ -20,11 +11,14 @@ class InitialColumnProgNN(object):
         self
 #         , topology, activations
 #         , layers_func
-        , n_input, n_output, session, dtype_X, dtype_y):
+        , n_input, n_output, session, dtype_X, dtype_y
+    ):
 #         n_input = topology[0] # TODO: after modified into function
         # Layers in network.
 #         L = len(topology) - 1
         self.session = session
+        self.dtype_X = dtype_X
+        self.dtype_y = dtype_y
 #         self.L = L # n_layers except input layer
 #         self.topology = topology
 #         self.layers_func = layers_func # TODO: want to modify to FUNCTION
@@ -43,9 +37,19 @@ class InitialColumnProgNN(object):
         
         self.train_op = None # opt.minimize(self.loss)
         
-        self.loss_history = []
+        self.loss_hist_train = []
+        self.loss_hist_val = []
         
-        
+    def weight_fc(self, shape, stddev=0.1, initial=None):
+        if initial is None:
+            initial = tf.truncated_normal(shape,stddev=stddev,dtype=self.dtype_X)
+        return initial
+
+    def bias_fc(self, shape, init_bias=0.1, initial=None):
+        if initial is None:
+            initial = tf.constant(init_bias,shape=shape,dtype=self.dtype_X)
+            initial = tf.Variable(initial)
+        return initial
     def add_fc(
         self
 #         , inputs
@@ -53,15 +57,15 @@ class InitialColumnProgNN(object):
         , out_size, activation_func=None, output_layer=False):
 #         Weights = tf.Variable(tf.random_normal([in_size,out_size]))
 #         biases = tf.Variable(tf.zeros([1,out_size]) + 0.1)
-        inputs = self.h[-1]
+        inputs = self.h[-1] # last layer output as input
         in_size = inputs.get_shape().as_list()[1]#self.session.run(tf.shape(inputs))[1] # TODO: get input shape = [1,out_size]
         shape_W = [in_size,out_size]
         shape_b = [1,out_size]
         print('FC_layer, shape_W =',shape_W,', shape_b =',shape_b)
         
-        Weights = weight_fc(shape_W)
-        biases = bias_fc(shape_b)
-        WX_b = tf.matmul(inputs, Weights + biases)
+        Weights = self.weight_fc(shape_W)
+        biases = self.bias_fc(shape_b)
+        WX_b = tf.matmul(inputs, Weights) + biases
         if activation_func is None:
             out = WX_b
         else:
@@ -101,7 +105,7 @@ class InitialColumnProgNN(object):
         for epoch in range(1,n_epochs+1):
 #             print('Epoch',epoch,'start.')
             for step in range(0,steps_per_epoch): # n_sample=1000, batch_size=10, steps_per_epoch=100
-                if step != steps_per_epoch-1:
+                if step != steps_per_epoch-1: # last step
                     X_batch = X[step*batch_size:(step+1)*batch_size]
                     y_batch = y[step*batch_size:(step+1)*batch_size]
                 else:
@@ -112,9 +116,10 @@ class InitialColumnProgNN(object):
                     self.train_op
                     , feed_dict={self.Xs:X_batch, self.ys:y_batch}
                 )
-                if counter==0 or counter%display_steps==0:
-                    loss = self.session.run(self.loss,feed_dict={self.Xs:X_batch, self.ys:y_batch})
-                    print('Epoch',epoch,', step',step,', loss =',loss)
+                if counter%display_steps==0 or (epoch==n_epochs and step==steps_per_epoch-1):
+                    loss_train = self.session.run(self.loss,feed_dict={self.Xs:X_batch, self.ys:y_batch})
+                    self.loss_hist_train.append(loss_train)
+                    print('Epoch',epoch,', step',step,', train loss =',loss_train)
                 counter += 1
                 
     
@@ -134,12 +139,12 @@ if __name__ == "__main__":
     session = tf.Session(config = config)
 #     session.run(tf.global_variables_initializer())
 
-    X_data = np.random.random((6000))[:, np.newaxis]*100
-    noise = np.random.normal(0, 0.05, X_data.shape).astype(np.float32)*0
-    y_data = X_data*2 + 1 + noise
-#     X_data = np.linspace(-1,1,300, dtype=np.float32)[:, np.newaxis]
-#     noise = np.random.normal(0, 0.05, X_data.shape).astype(np.float32)
-#     y_data = np.square(X_data) - 0.5 + noise
+#     X_data = np.random.random((6000))[:, np.newaxis]*100
+#     noise = np.random.normal(0, 0.05, X_data.shape).astype(np.float32)*0
+#     y_data = X_data*2 + 1 + noise
+    X_data = np.linspace(-1,1,300, dtype=np.float32)[:, np.newaxis]
+    noise = np.random.normal(0, 0.05, X_data.shape).astype(np.float32)
+    y_data = np.square(X_data) - 0.5 + noise
     print('X_data',X_data.shape,'\n',X_data[:5])
     print('y_data',y_data.shape,'\n',y_data[:5])
     
@@ -148,25 +153,25 @@ if __name__ == "__main__":
         n_input=n_input
         , n_output=1
         , session=session
-        , dtype_X=tf.float64, dtype_y=tf.float64
+        , dtype_X=tf.float32, dtype_y=tf.float32
     )
-    col_0.add_fc(1000,activation_func=tf.nn.relu)
+    col_0.add_fc(10,activation_func=tf.nn.relu)
 #     col_0.add_fc(1024,activation_func=tf.nn.relu)
     col_0.add_fc(1,activation_func=None,output_layer=True)
     col_0.compile_nn(
 #         loss_func=tf.losses.mean_squared_error
-#         loss=tf.reduce_mean(tf.reduce_sum(tf.square(col_0.ys - col_0.prediction),reduction_indices=[1]))
-        loss=tf.losses.mean_squared_error(col_0.ys,col_0.prediction)
-        ,opt=tf.train.AdamOptimizer(learning_rate=1e-4)
-#         ,opt=tf.train.GradientDescentOptimizer(learning_rate=1e-1)
+        loss=tf.reduce_mean(tf.reduce_sum(tf.square(col_0.ys - col_0.prediction),reduction_indices=[1]))
+#         loss=tf.losses.mean_squared_error(col_0.ys,col_0.prediction)
+#         ,opt=tf.train.AdamOptimizer(learning_rate=1e-3)
+        ,opt=tf.train.GradientDescentOptimizer(learning_rate=1e-1)
 #         ,mectrics=[]
     )
     col_0.train(
         X=X_data
         , y=y_data
-        , batch_size=32
-        , n_epochs=200
-        , display_steps=100
+        , batch_size=None
+        , n_epochs=1000
+        , display_steps=50
     )
 
 
