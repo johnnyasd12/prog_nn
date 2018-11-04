@@ -1,9 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from pprint import pprint
-# from param_collection import ParamCollection
-
-
+from param_collection import ParamCollection
 
 class InitialColumnProgNN(object):
 
@@ -11,38 +9,45 @@ class InitialColumnProgNN(object):
         self
 #         , topology, activations
 #         , layers_func
-        , n_input, n_output, session, dtype_X, dtype_y
+        , input_dims, output_dims, session, dtype_X, dtype_y
     ):
-#         n_input = topology[0] # TODO: after modified into function
+#         input_dims = topology[0] # TODO: after modified into function
         # Layers in network.
 #         L = len(topology) - 1
+        
+        #         self.L = L # n_layers except input layer
+#         self.topology = topology
+#         self.layers_func = layers_func # TODO: want to modify to FUNCTION
+        self.L = 0 # n_layers except input layer
+        self.topology = [input_dims] # output dims of each layer
+        self.activations = []
+        # tensorflow
         self.session = session
         self.dtype_X = dtype_X
         self.dtype_y = dtype_y
-#         self.L = L # n_layers except input layer
-#         self.topology = topology
-#         self.layers_func = layers_func # TODO: want to modify to FUNCTION
-        self.Xs = tf.placeholder(dtype_X,shape=[None, n_input]) # output of input layer
-        self.ys = tf.placeholder(dtype_y,shape=[None, n_output])
-
+        self.Xs = tf.placeholder(dtype_X,shape=[None, input_dims]) # output of input layer
+        self.ys = tf.placeholder(dtype_y,shape=[None, output_dims])
         # below are Tensor
         self.W = [] # weights in each layer
         self.b =[] # biases in each layer
         self.h = [self.Xs] # activation output in each layer
         self.params = [] # store all Ws and bs, will be modified when W and b is trained i think
-        self.logits = None
+        self.logits = None # neurons before input to final activation
         self.prediction = None
         self.loss = None # output loss
         # above are Tensor
         self.opt = None
         self.train_op = None # opt.minimize(self.loss)
-        
+        # loss history
         self.loss_hist_train = []
         self.loss_hist_val = []
+        # param collection
+        self.pc = None
         
     def weight_fc(self, shape, stddev=0.1, initial=None):
         if initial is None:
 #             initial = tf.truncated_normal(shape,stddev=stddev,dtype=self.dtype_X)
+#             initial = tf.Variable(initial)
             initial = tf.Variable(tf.random_normal(shape))
         return initial
 
@@ -52,16 +57,19 @@ class InitialColumnProgNN(object):
 #             initial = tf.Variable(initial)
             initial = tf.Variable(tf.zeros(shape) + 0.1)
         return initial
+    
     def add_fc(
         self
 #         , inputs
 #         , in_size
-        , out_size, activation_func=None, output_layer=False):
+        , out_size, activation_func=None, output_layer=False, initial=None):
         
 #         Weights = tf.Variable(tf.random_normal([in_size,out_size]))
 #         biases = tf.Variable(tf.zeros([1,out_size]) + 0.1)
         inputs = self.h[-1] # last layer output as input
-        in_size = inputs.get_shape().as_list()[1]#self.session.run(tf.shape(inputs))[1] # TODO: get input shape = [1,out_size]
+        shape_inputs = inputs.get_shape().as_list()
+        print('FC_layer, shape_inputs =',shape_inputs)
+        in_size = shape_inputs[1]#self.session.run(tf.shape(inputs))[1] # TODO: get input shape = [1,out_size]
         shape_W = [in_size,out_size]
         shape_b = [1,out_size]
         print('FC_layer, shape_W =',shape_W,', shape_b =',shape_b)
@@ -73,6 +81,9 @@ class InitialColumnProgNN(object):
             out = WX_b
         else:
             out = activation_func(WX_b)
+        self.topology.append(out_size)
+        self.activations.append(activation_func)
+        self.L = self.L + 1
         self.W.append(Weights)
         self.b.append(biases)
         self.h.append(out)
@@ -97,6 +108,7 @@ class InitialColumnProgNN(object):
         self.loss = loss
         self.opt = opt
         self.train_op = self.opt.minimize(self.loss)
+        self.pc = ParamCollection(self.session, self.params)
         
     def train(self, X, y, n_epochs, batch_size=None, data_valid=None, display_steps=50): 
         # data_valid:tuple
@@ -152,10 +164,10 @@ if __name__ == "__main__":
     print('X_data',X_data.shape,'\n',X_data[:5])
     print('y_data',y_data.shape,'\n',y_data[:5])
     
-    n_input = X_data.shape[1]
+    input_dims = X_data.shape[1]
     col_0 = InitialColumnProgNN(
-        n_input=n_input
-        , n_output=1
+        input_dims=input_dims
+        , output_dims=1
         , session=session
         , dtype_X=tf.float32, dtype_y=tf.float32
     )
@@ -163,9 +175,8 @@ if __name__ == "__main__":
 #     col_0.add_fc(1024,activation_func=tf.nn.relu)
     col_0.add_fc(1,activation_func=None,output_layer=True)
     col_0.compile_nn(
-#         loss_func=tf.losses.mean_squared_error
-        loss=tf.reduce_mean(tf.reduce_sum(tf.square(col_0.ys - col_0.prediction),reduction_indices=[1]))
-#         loss=tf.losses.mean_squared_error(col_0.ys,col_0.prediction)
+#         loss=tf.reduce_mean(tf.reduce_sum(tf.square(col_0.ys - col_0.prediction),reduction_indices=[1]))
+        loss=tf.losses.mean_squared_error(col_0.ys,col_0.prediction)
 #         ,opt=tf.train.AdamOptimizer(learning_rate=1e-3)
         ,opt=tf.train.GradientDescentOptimizer(learning_rate=1e-1)
 #         ,mectrics=[]
