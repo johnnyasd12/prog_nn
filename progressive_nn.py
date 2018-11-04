@@ -34,7 +34,7 @@ class InitialColumnProgNN(object):
         self.prediction = None
         self.loss = None # output loss
         # above are Tensor
-        
+        self.opt = None
         self.train_op = None # opt.minimize(self.loss)
         
         self.loss_hist_train = []
@@ -42,19 +42,22 @@ class InitialColumnProgNN(object):
         
     def weight_fc(self, shape, stddev=0.1, initial=None):
         if initial is None:
-            initial = tf.truncated_normal(shape,stddev=stddev,dtype=self.dtype_X)
+#             initial = tf.truncated_normal(shape,stddev=stddev,dtype=self.dtype_X)
+            initial = tf.Variable(tf.random_normal(shape))
         return initial
 
     def bias_fc(self, shape, init_bias=0.1, initial=None):
         if initial is None:
-            initial = tf.constant(init_bias,shape=shape,dtype=self.dtype_X)
-            initial = tf.Variable(initial)
+#             initial = tf.constant(init_bias,shape=shape,dtype=self.dtype_X)
+#             initial = tf.Variable(initial)
+            initial = tf.Variable(tf.zeros(shape) + 0.1)
         return initial
     def add_fc(
         self
 #         , inputs
 #         , in_size
         , out_size, activation_func=None, output_layer=False):
+        
 #         Weights = tf.Variable(tf.random_normal([in_size,out_size]))
 #         biases = tf.Variable(tf.zeros([1,out_size]) + 0.1)
         inputs = self.h[-1] # last layer output as input
@@ -81,6 +84,7 @@ class InitialColumnProgNN(object):
         self.params.append(self.W[-1])
         self.params.append(self.b[-1])
 #         self.pc = ParamCollection(self.session, params) # TODO: watch this
+
     def compile_nn(self, loss, opt, metrics=None):
         # metrics:list
         
@@ -91,7 +95,8 @@ class InitialColumnProgNN(object):
             print("Error: no output layer set.")
 #         self.loss = loss_func(self.ys, self.logits) # TODO: if ReLU + MSE then not proper
         self.loss = loss
-        self.train_op = opt.minimize(self.loss)
+        self.opt = opt
+        self.train_op = self.opt.minimize(self.loss)
         
     def train(self, X, y, n_epochs, batch_size=None, data_valid=None, display_steps=50): 
         # data_valid:tuple
@@ -103,7 +108,6 @@ class InitialColumnProgNN(object):
         steps_per_epoch = int(n_samples/batch_size)
         counter = 0
         for epoch in range(1,n_epochs+1):
-#             print('Epoch',epoch,'start.')
             for step in range(0,steps_per_epoch): # n_sample=1000, batch_size=10, steps_per_epoch=100
                 if step != steps_per_epoch-1: # last step
                     X_batch = X[step*batch_size:(step+1)*batch_size]
