@@ -39,9 +39,11 @@ class InitialColumnProgNN(object):
         # above are Tensor
         self.opt = None
         self.train_op = None # opt.minimize(self.loss)
-        # loss history
-        self.loss_hist_train = []
-        self.loss_hist_val = []
+        # loss, metrics history
+        self.loss_his_train = []
+        self.loss_his_val = []
+        self.metrics_his_train = {}
+        self.metrics_his_val = {}
         # param collection
         self.pc = None
         
@@ -63,7 +65,9 @@ class InitialColumnProgNN(object):
         self
 #         , inputs
 #         , in_size
-        , out_size, activation_func=None, output_layer=False, initial=None):
+        , out_size, activation_func=None
+        # , output_layer=False
+        , initial=None):
         
 #         Weights = tf.Variable(tf.random_normal([in_size,out_size]))
 #         biases = tf.Variable(tf.zeros([1,out_size]) + 0.1)
@@ -89,9 +93,9 @@ class InitialColumnProgNN(object):
         self.W.append(Weights)
         self.b.append(biases)
         self.h.append(out)
-        if output_layer:
-            self.logits = WX_b
-            self.prediction = self.h[-1]
+        # if output_layer:
+        self.logits = WX_b
+        self.prediction = self.h[-1]
         
         # for ParamCollection
         self.params.append(self.W[-1])
@@ -104,15 +108,17 @@ class InitialColumnProgNN(object):
         # loss_func:
         # tf.nn.softmax_cross_entropy_with_logits, 
         # tf.losses.mean_squared_error
-        if self.logits is None:
-            print("Error: no output layer set.")
+        # if self.logits is None:
+        #     print("Error: no output layer set.")
 #         self.loss = loss_func(self.ys, self.logits) # TODO: if ReLU + MSE then not proper
+        # self.prediction = self.h[-1]
+
         self.loss = loss
         self.opt = opt
         self.train_op = self.opt.minimize(self.loss)
         self.pc = ParamCollection(self.session, self.params)
         
-    def train(self, X, y, n_epochs, batch_size=None, data_valid=None, display_steps=50): 
+    def train(self, X, y, n_epochs, batch_size=None, val_set=None, display_steps=50): 
         # data_valid:list
 
         self.session.run(tf.global_variables_initializer())
@@ -137,13 +143,13 @@ class InitialColumnProgNN(object):
                 )
                 if counter%display_steps==0 or (epoch==n_epochs and step==steps_per_epoch-1):
                     loss_train = self.session.run(self.loss,feed_dict={self.Xs:X_batch, self.ys:y_batch})
-                    self.loss_hist_train.append(loss_train)
+                    self.loss_his_train.append(loss_train)
                     print('Epoch',epoch,', step',step,', loss =',loss_train, end=' ')
-                    if data_valid is not None:
-                        X_val = data_valid[0]
-                        y_val = data_valid[1]
+                    if val_set is not None:
+                        X_val = val_set[0]
+                        y_val = val_set[1]
                         loss_val = self.session.run(self.loss,feed_dict={self.Xs:X_val,self.ys:y_val})
-                        self.loss_hist_val.append(loss_val)
+                        self.loss_his_val.append(loss_val)
                         print(', val_loss =',loss_val)
                     else:
                         print()
@@ -186,7 +192,7 @@ if __name__ == "__main__":
 #     X_data = np.random.random((6000))[:, np.newaxis]*100
 #     noise = np.random.normal(0, 0.05, X_data.shape).astype(np.float32)*0
 #     y_data = X_data*2 + 1 + noise
-    try_reg = False
+    try_reg = True
     if try_reg:
         X_data = np.linspace(-1,1,300, dtype=np.float32)[:, np.newaxis]
         noise = np.random.normal(0, 0.05, X_data.shape).astype(np.float32)
@@ -203,7 +209,9 @@ if __name__ == "__main__":
         )
         col_0.add_fc(10,activation_func=tf.nn.relu)
     #     col_0.add_fc(1024,activation_func=tf.nn.relu)
-        col_0.add_fc(1,activation_func=None,output_layer=True)
+        col_0.add_fc(1,activation_func=None
+            # ,output_layer=True
+            )
         col_0.compile_nn(
     #         loss=tf.reduce_mean(tf.reduce_sum(tf.square(col_0.ys - col_0.prediction),reduction_indices=[1]))
             loss=tf.losses.mean_squared_error(col_0.ys,col_0.prediction)
@@ -238,21 +246,24 @@ if __name__ == "__main__":
             input_dims=input_dims
             , output_dims=output_dims
             , session=session
-            , dtype_X=tf.float64
-            , dtype_y=tf.float64)
+            , dtype_X=tf.float32
+            , dtype_y=tf.float32)
         col_cls_0.add_fc(512,activation_func=tf.nn.relu)
         col_cls_0.add_fc(256,activation_func=tf.nn.relu)
-        col_cls_0.add_fc(output_dims,activation_func=tf.nn.softmax,output_layer=True)
+        col_cls_0.add_fc(128,activation_func=tf.nn.relu)
+        col_cls_0.add_fc(output_dims,activation_func=tf.nn.softmax
+            # ,output_layer=True
+            )
         col_cls_0.compile_nn(
             loss=tf.losses.softmax_cross_entropy(col_cls_0.ys,col_cls_0.logits)
             , opt=tf.train.AdamOptimizer(learning_rate=1e-3))
         col_cls_0.train(
             X=X_train
             ,y=y_train
-            ,data_valid=[X_val,y_val]
-            ,batch_size=128
-            ,n_epochs=20
-            ,display_steps=200)
+            ,val_set=[X_val,y_val]
+            ,batch_size=32
+            ,n_epochs=10
+            ,display_steps=100)
 
 
 
