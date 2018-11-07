@@ -2,7 +2,6 @@ import tensorflow as tf
 import numpy as np
 from pprint import pprint
 from param_collection import ParamCollection
-from tensorflow.examples.tutorials.mnist import input_data
 
 class InitialColumnProgNN(object):
 
@@ -26,6 +25,7 @@ class InitialColumnProgNN(object):
         self.session = session
         self.dtype_X = dtype_X
         self.dtype_y = dtype_y
+        # TODO: loop input_dims for initializing shape
         self.Xs = tf.placeholder(dtype_X,shape=[None, input_dims]) # output of input layer
         self.ys = tf.placeholder(dtype_y,shape=[None, output_dims])
         # below are Tensor
@@ -39,6 +39,7 @@ class InitialColumnProgNN(object):
         # above are Tensor
         self.opt = None
         self.train_op = None # opt.minimize(self.loss)
+        self.metrics = None # metric names
         # loss, metrics history
         self.loss_his_train = []
         self.loss_his_val = []
@@ -116,13 +117,14 @@ class InitialColumnProgNN(object):
         self.loss = loss
         self.opt = opt
         self.train_op = self.opt.minimize(self.loss)
+        self.metrics = metrics
         self.pc = ParamCollection(self.session, self.params)
+        
+        self.session.run(tf.global_variables_initializer())
         
     def train(self, X, y, n_epochs, batch_size=None, val_set=None, display_steps=50): 
         # data_valid:list
 
-        self.session.run(tf.global_variables_initializer())
-        
         n_samples = X.shape[0]
         if batch_size is None:
             batch_size = n_samples
@@ -142,22 +144,66 @@ class InitialColumnProgNN(object):
                     , feed_dict={self.Xs:X_batch, self.ys:y_batch}
                 )
                 if counter%display_steps==0 or (epoch==n_epochs and step==steps_per_epoch-1):
+                    
                     loss_train = self.session.run(self.loss,feed_dict={self.Xs:X_batch, self.ys:y_batch})
                     self.loss_his_train.append(loss_train)
-                    print('Epoch',epoch,', step',step,', loss =',loss_train, end=' ')
+                    print('Epoch',epoch,', step',step,', loss=',loss_train, end=' ')
+                    
+                    if self.metrics is not None:
+#                         y_pred_batch = self.session.run(self.prediction,feed_dict={self.Xs:X_batch})
+                        m = self.get_metrics(X_batch, y_batch)
+                        for m_name,m_value in m.items():
+                            print(m_name,'=',m_value, end=' ')
+
                     if val_set is not None:
                         X_val = val_set[0]
                         y_val = val_set[1]
                         loss_val = self.session.run(self.loss,feed_dict={self.Xs:X_val,self.ys:y_val})
                         self.loss_his_val.append(loss_val)
-                        print(', val_loss =',loss_val)
+                        print(', val_loss=',loss_val, end=' ')
+                        if self.metrics is not None:
+#                             y_pred_val = self.session.run(self.prediction,feed_dict={self.Xs:X_val})
+                            m_val = self.get_metrics(X_val,y_val)
+                            for m_name,m_value in m_val.items():
+                                print('val',m_name,'=',m_value,end=' ')
+                        print()
                     else:
                         print()
                 counter += 1
                 
     
-    def predict(X):
+    def predict(self, X):
         return self.session.run(self.prediction,feed_dict={self.Xs:X})
+
+#     def evaluate(self, y_true, y_pred, metrics): # y: array , metrics: list
+#         func = { # tensor
+#             'acc': lambda y_t,y_p:tf.reduce_mean(tf.cast(tf.equal(tf.argmax(y_p, axis=1), tf.argmax(y_t, axis=1)),self.dtype_X))
+#         }
+#         dict_metrics = {}
+#         for m_name in metrics:
+#             if isinstance(m_name,str):
+#                 dict_metrics[m_name] = self.session.run(func[m_name](y_true,y_pred))
+#             else: # TODO: 
+#                 pass
+#         return dict_metrics
+    def get_metrics(self, X, y):
+        func = {
+            'acc':self.compute_accuracy
+        }
+        dict_metrics = {}
+        for m_name in self.metrics:
+            if isinstance(m_name,str):
+                dict_metrics[m_name] = func[m_name](X,y)
+            else: # TODO: gogogo
+                pass
+        return dict_metrics
+    def compute_accuracy(self, X, y): # input array
+#         y_pred = self.session.run(self.prediction, feed_dict={self.Xs: X})
+        correct_prediction = tf.equal(tf.argmax(self.prediction,axis=1), tf.argmax(self.ys,axis=1))
+        accuracy = tf.reduce_mean(tf.cast(correct_prediction, self.dtype_X))
+        result = self.session.run(accuracy, feed_dict={self.Xs: X, self.ys: y})
+        return result
+
 
 
 def check_obj(obj_str):
@@ -183,7 +229,7 @@ if __name__ == "__main__":
     mem_fraction = 0.25
     gpu_options = tf.GPUOptions(
         allow_growth=True
-        ,per_process_gpu_memory_fraction=mem_fraction
+#         ,per_process_gpu_memory_fraction=mem_fraction
         )
     config = tf.ConfigProto(gpu_options=gpu_options)
     session = tf.Session(config = config)
@@ -229,6 +275,8 @@ if __name__ == "__main__":
 
     try_cls = True
     if try_cls:
+        from tensorflow.examples.tutorials.mnist import input_data
+
         mnist = input_data.read_data_sets("/tmp/data/", one_hot=True)
         X_train = mnist.train.images#.astype(np.float64)
         y_train = mnist.train.labels#.astype(np.float64)
@@ -256,7 +304,8 @@ if __name__ == "__main__":
             )
         col_cls_0.compile_nn(
             loss=tf.losses.softmax_cross_entropy(col_cls_0.ys,col_cls_0.logits)
-            , opt=tf.train.AdamOptimizer(learning_rate=1e-3))
+            , opt=tf.train.AdamOptimizer(learning_rate=1e-3)
+            , metrics = ['acc'])
         col_cls_0.train(
             X=X_train
             ,y=y_train
