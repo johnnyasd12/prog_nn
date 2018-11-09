@@ -3,6 +3,9 @@ import numpy as np
 from pprint import pprint
 from param_collection import ParamCollection
 
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+
 class InitialColumnProgNN(object):
 
     def __init__(
@@ -21,13 +24,15 @@ class InitialColumnProgNN(object):
         self.L = 0 # n_layers except input layer
         self.topology = [input_dims] # output dims of each layer
         self.activations = []
+        self.layer_funcs = []
         # tensorflow
         self.session = session
         self.dtype_X = dtype_X
         self.dtype_y = dtype_y
         # TODO: loop input_dims for initializing shape
-        self.Xs = tf.placeholder(dtype_X,shape=[None, input_dims]) # output of input layer
-        self.ys = tf.placeholder(dtype_y,shape=[None, output_dims])
+        with tf.name_scope('inputs'):
+            self.Xs = tf.placeholder(dtype_X,shape=[None, input_dims]) # output of input layer
+            self.ys = tf.placeholder(dtype_y,shape=[None, output_dims])
         # below are Tensor
         self.W = [] # weights in each layer
         self.b =[] # biases in each layer
@@ -90,6 +95,7 @@ class InitialColumnProgNN(object):
 
         self.topology.append(out_size)
         self.activations.append(activation_func)
+        self.layer_funcs.append(self.add_fc)
         self.L = self.L + 1
         self.W.append(Weights)
         self.b.append(biases)
@@ -226,6 +232,7 @@ def check_obj(obj_str):
             print(len(obj))
 
 if __name__ == "__main__":
+    # session settings
     mem_fraction = 0.25
     gpu_options = tf.GPUOptions(
         allow_growth=True
@@ -233,13 +240,17 @@ if __name__ == "__main__":
         )
     config = tf.ConfigProto(gpu_options=gpu_options)
     session = tf.Session(config = config)
-#     session.run(tf.global_variables_initializer())
+    # seed settings
+    seed = int(os.getenv("SEED", 12))
+    tf.set_random_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
 
-#     X_data = np.random.random((6000))[:, np.newaxis]*100
-#     noise = np.random.normal(0, 0.05, X_data.shape).astype(np.float32)*0
-#     y_data = X_data*2 + 1 + noise
     try_reg = True
     if try_reg:
+#         X_data = np.random.random((6000))[:, np.newaxis]*100
+#         noise = np.random.normal(0, 0.05, X_data.shape).astype(np.float32)*0
+#         y_data = X_data*2 + 1 + noise
         X_data = np.linspace(-1,1,300, dtype=np.float32)[:, np.newaxis]
         noise = np.random.normal(0, 0.05, X_data.shape).astype(np.float32)
         y_data = np.square(X_data) - 0.5 + noise
@@ -299,9 +310,7 @@ if __name__ == "__main__":
         col_cls_0.add_fc(512,activation_func=tf.nn.relu)
         col_cls_0.add_fc(256,activation_func=tf.nn.relu)
         col_cls_0.add_fc(128,activation_func=tf.nn.relu)
-        col_cls_0.add_fc(output_dims,activation_func=tf.nn.softmax
-            # ,output_layer=True
-            )
+        col_cls_0.add_fc(output_dims,activation_func=tf.nn.softmax)
         col_cls_0.compile_nn(
             loss=tf.losses.softmax_cross_entropy(col_cls_0.ys,col_cls_0.logits)
             , opt=tf.train.AdamOptimizer(learning_rate=1e-3)
