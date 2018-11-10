@@ -11,7 +11,7 @@ from utils import *
 
 class InitialColumnProgNN(object):
 
-    def __init__(self, input_dims, output_dims, session, dtype_X, dtype_y):
+    def __init__(self, input_dims, output_dims, dtype_X, dtype_y, session=None):
 #         input_dims = topology[0] # TODO: after modified into function
         # Layers in network.
 #         L = len(topology) - 1
@@ -24,7 +24,10 @@ class InitialColumnProgNN(object):
         self.activations = []
         self.layer_funcs = []
         # tensorflow
-        self.session = session
+        if session is None:
+            self.session = create_session(gpu_id='0')
+        else:
+            self.session = session
         self.dtype_X = dtype_X
         self.dtype_y = dtype_y
         # TODO: loop input_dims for initializing shape
@@ -51,6 +54,16 @@ class InitialColumnProgNN(object):
         # param collection
         self.pc = None
         
+#     def create_session(self, gpu_id='0', mem_fraction=None):
+#         os.environ["CUDA_VISIBLE_DEVICES"] = gpu_id
+#         with tf.device('/gpu:' + gpu_id):
+#             config = tf.ConfigProto()
+#             config.gpu_options.allow_growth = True
+#             if mem_fraction is not None:
+#                 config.gpu_options.per_process_gpu_memory_fraction=mem_fraction
+#             session = tf.Session(config = config)
+#         return session
+        
     def weight_fc(self, shape, stddev=0.1, initial=None):
         if initial is None:
             initial = tf.truncated_normal(shape,stddev=stddev,dtype=self.dtype_X)
@@ -76,8 +89,8 @@ class InitialColumnProgNN(object):
 #         Weights = tf.Variable(tf.random_normal([in_size,out_size]))
 #         biases = tf.Variable(tf.zeros([1,out_size]) + 0.1)
         inputs = self.h[-1] # last layer output as input
-        self.L = self.L + 1
         shape_inputs = inputs.get_shape().as_list()
+        self.L = self.L + 1
         print('Layer',self.L,': FC, input shape =',shape_inputs,', out_size =',out_size)
         in_size = shape_inputs[1]#self.session.run(tf.shape(inputs))[1] # TODO: get input shape = [1,out_size]
         shape_W = [in_size,out_size]
@@ -234,32 +247,37 @@ class InitialColumnProgNN(object):
             print('no metrics to plot')
         else:
             for m_name in self.metrics:
-                plt.title('metrics:'+m_name)
+                plt.title('metrics: '+m_name)
                 plt.plot(self.his_metrics_train[m_name], label='training '+m_name)
                 plt.plot(self.his_metrics_val[m_name], label='validation '+m_name)
                 plt.legend()
                 plt.show()
+        
+    def save_model(self): # TODO
+        pass
+    def load_model(self): # TODO
+        pass
 
 
 
-def check_obj(obj_str):
-    obj = eval(obj_str)
-    obj_type = type(obj)
-    print(obj_str
-        , obj_type
-        , end = ' '
-        )
-    if obj_type == np.ndarray:
-        print(obj.shape)
-    else:
-        try:
-            iterator = iter(obj)
-        except TypeError:
-            # not iterable
-            print(obj)
-        else:
-            # iterable
-            print(len(obj))
+# def print_obj(obj_str):
+#     obj = eval(obj_str)
+#     obj_type = type(obj)
+#     print(obj_str
+#         , obj_type
+#         , end = ' '
+#         )
+#     if obj_type == np.ndarray:
+#         print(obj.shape)
+#     else:
+#         try:
+#             iterator = iter(obj)
+#         except TypeError:
+#             # not iterable
+#             print(obj)
+#         else:
+#             # iterable
+#             print(len(obj))
 
 # if __name__ == "__main__":
 #     # session settings
@@ -326,12 +344,12 @@ def check_obj(obj_str):
 #         y_val = mnist.validation.labels
 #         X_test = mnist.test.images
 #         y_test = mnist.test.labels
-#         check_obj('X_train')
-#         check_obj('y_train')
+#         print_obj('X_train')
+#         print_obj('y_train')
 #         input_dims = X_train.shape[1]
 #         output_dims = y_train.shape[1]
-#         check_obj('input_dims')
-#         check_obj('output_dims')
+#         print_obj('input_dims')
+#         print_obj('output_dims')
 #         col_cls_0 = InitialColumnProgNN(
 #             input_dims=input_dims
 #             , output_dims=output_dims
