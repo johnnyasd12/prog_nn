@@ -5,17 +5,12 @@ from param_collection import ParamCollection
 
 import random
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+# os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 import matplotlib.pyplot as plt
 
 class InitialColumnProgNN(object):
 
-    def __init__(
-        self
-#         , topology, activations
-#         , layers_func
-        , input_dims, output_dims, session, dtype_X, dtype_y
-    ):
+    def __init__(self, input_dims, output_dims, session, dtype_X, dtype_y):
 #         input_dims = topology[0] # TODO: after modified into function
         # Layers in network.
 #         L = len(topology) - 1
@@ -48,10 +43,10 @@ class InitialColumnProgNN(object):
         self.train_op = None # opt.minimize(self.loss)
         self.metrics = None # metric names
         # loss, metrics history
-        self.loss_his_train = []
-        self.loss_his_val = []
-        self.metrics_his_train = {}
-        self.metrics_his_val = {}
+        self.his_loss_train = []
+        self.his_loss_val = []
+        self.his_metrics_train = {}
+        self.his_metrics_val = {}
         # param collection
         self.pc = None
         
@@ -80,12 +75,13 @@ class InitialColumnProgNN(object):
 #         Weights = tf.Variable(tf.random_normal([in_size,out_size]))
 #         biases = tf.Variable(tf.zeros([1,out_size]) + 0.1)
         inputs = self.h[-1] # last layer output as input
+        self.L = self.L + 1
         shape_inputs = inputs.get_shape().as_list()
-        print('FC_layer, shape_inputs =',shape_inputs)
+        print('Layer',self.L,': FC, input shape =',shape_inputs,', out_size =',out_size)
         in_size = shape_inputs[1]#self.session.run(tf.shape(inputs))[1] # TODO: get input shape = [1,out_size]
         shape_W = [in_size,out_size]
         shape_b = [1,out_size]
-        print('FC_layer, shape_W =',shape_W,', shape_b =',shape_b)
+#         print('FC_layer, shape_W =',shape_W,', shape_b =',shape_b)
         
         Weights = self.weight_fc(shape_W)
         biases = self.bias_fc(shape_b)
@@ -98,7 +94,6 @@ class InitialColumnProgNN(object):
         self.topology.append(out_size)
         self.activations.append(activation_func)
         self.layer_funcs.append(self.add_fc)
-        self.L = self.L + 1
         self.W.append(Weights)
         self.b.append(biases)
         self.h.append(out)
@@ -128,15 +123,14 @@ class InitialColumnProgNN(object):
         self.metrics = metrics
         if metrics is not None:
             for m_name in metrics:
-                self.metrics_his_train[m_name] = []
-                self.metrics_his_val[m_name] = []
+                self.his_metrics_train[m_name] = []
+                self.his_metrics_val[m_name] = []
         self.pc = ParamCollection(self.session, self.params)
         
         self.session.run(tf.global_variables_initializer())
         
     def train(self, X, y, n_epochs, batch_size=None, val_set=None, display_steps=50): 
         # data_valid:list
-
         n_samples = X.shape[0]
         if batch_size is None:
             batch_size = n_samples
@@ -158,7 +152,7 @@ class InitialColumnProgNN(object):
                 if counter%display_steps==0 or (epoch==n_epochs and step==steps_per_epoch-1):
                     
                     loss_train = self.session.run(self.loss,feed_dict={self.Xs:X_batch, self.ys:y_batch})
-                    self.loss_his_train.append(loss_train)
+                    self.his_loss_train.append(loss_train)
                     print('Epoch',epoch,', step',step,', loss=',loss_train, end=' ')
                     
                     if self.metrics is not None:
@@ -166,20 +160,20 @@ class InitialColumnProgNN(object):
                         m = self.get_metrics(X_batch, y_batch)
                         for m_name,m_value in m.items():
                             print(m_name,'=',m_value, end=' ')
-                            self.metrics_his_train[m_name].append(m_value)
+                            self.his_metrics_train[m_name].append(m_value)
 
                     if val_set is not None:
                         X_val = val_set[0]
                         y_val = val_set[1]
                         loss_val = self.session.run(self.loss,feed_dict={self.Xs:X_val,self.ys:y_val})
-                        self.loss_his_val.append(loss_val)
+                        self.his_loss_val.append(loss_val)
                         print(', val_loss=',loss_val, end=' ')
                         if self.metrics is not None:
 #                             y_pred_val = self.session.run(self.prediction,feed_dict={self.Xs:X_val})
                             m_val = self.get_metrics(X_val,y_val)
                             for m_name,m_value in m_val.items():
                                 print('val',m_name,'=',m_value,end=' ')
-                                self.metrics_his_val[m_name].append(m_value)
+                                self.his_metrics_val[m_name].append(m_value)
                     print()
                     
                 counter += 1
@@ -218,20 +212,26 @@ class InitialColumnProgNN(object):
         return result
     
     def plt_loss(self, title='loss'):
-        print('plotting loss...')
-        loss_t = self.loss_his_train
-        loss_v = self.loss_his_val
+        print('Plotting loss...')
+        loss_t = self.his_loss_train
+        loss_v = self.his_loss_val
         plt.title(title)
-        plt.plot(loss_t)
-        plt.plot(loss_v)
+        plt.plot(loss_t, label='training loss')
+        if len(self.his_loss_val) != 0:
+            plt.plot(loss_v, label='validation loss')
+        plt.legend()
         plt.show()
     
     def plt_metrics(self):
+        print('Plotting metrics...')
         if self.metrics is None:
             print('no metrics to plot')
         else:
-            for m_name,m_list in self.metrics.items():
-                pass
+            for m_name in self.metrics:
+                plt.title('metrics:'+m_name)
+                plt.plot(self.his_metrics_train[m_name])
+                plt.plot(self.his_metrics_val[m_name])
+                plt.show()
 
 
 
