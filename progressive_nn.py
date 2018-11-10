@@ -217,12 +217,21 @@ class InitialColumnProgNN(object):
         result = self.session.run(accuracy, feed_dict={self.Xs: X, self.ys: y})
         return result
     
-    def plt_loss(self):
+    def plt_loss(self, title='loss'):
+        print('plotting loss...')
         loss_t = self.loss_his_train
         loss_v = self.loss_his_val
+        plt.title(title)
         plt.plot(loss_t)
         plt.plot(loss_v)
         plt.show()
+    
+    def plt_metrics(self):
+        if self.metrics is None:
+            print('no metrics to plot')
+        else:
+            for m_name,m_list in self.metrics.items():
+                pass
 
 
 
@@ -245,99 +254,99 @@ def check_obj(obj_str):
             # iterable
             print(len(obj))
 
-if __name__ == "__main__":
-    # session settings
-    mem_fraction = 0.25
-    gpu_options = tf.GPUOptions(
-        allow_growth=True
-#         ,per_process_gpu_memory_fraction=mem_fraction
-        )
-    config = tf.ConfigProto(gpu_options=gpu_options)
-    session = tf.Session(config = config)
-    # seed settings
-    seed = int(os.getenv("SEED", 12))
-    tf.set_random_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
+# if __name__ == "__main__":
+#     # session settings
+#     mem_fraction = 0.25
+#     gpu_options = tf.GPUOptions(
+#         allow_growth=True
+# #         ,per_process_gpu_memory_fraction=mem_fraction
+#         )
+#     config = tf.ConfigProto(gpu_options=gpu_options)
+#     session = tf.Session(config = config)
+#     # seed settings
+#     seed = int(os.getenv("SEED", 12))
+#     tf.set_random_seed(seed)
+#     np.random.seed(seed)
+#     random.seed(seed)
 
-    try_reg = True
-    if try_reg:
-#         X_data = np.random.random((6000))[:, np.newaxis]*100
-#         noise = np.random.normal(0, 0.05, X_data.shape).astype(np.float32)*0
-#         y_data = X_data*2 + 1 + noise
-        X_data = np.linspace(-1,1,300, dtype=np.float32)[:, np.newaxis]
-        noise = np.random.normal(0, 0.05, X_data.shape).astype(np.float32)
-        y_data = np.square(X_data) - 0.5 + noise
-        print('X_data',X_data.shape,'\n',X_data[:5])
-        print('y_data',y_data.shape,'\n',y_data[:5])
+#     try_reg = True
+#     if try_reg:
+# #         X_data = np.random.random((6000))[:, np.newaxis]*100
+# #         noise = np.random.normal(0, 0.05, X_data.shape).astype(np.float32)*0
+# #         y_data = X_data*2 + 1 + noise
+#         X_data = np.linspace(-1,1,300, dtype=np.float32)[:, np.newaxis]
+#         noise = np.random.normal(0, 0.05, X_data.shape).astype(np.float32)
+#         y_data = np.square(X_data) - 0.5 + noise
+#         print('X_data',X_data.shape,'\n',X_data[:5])
+#         print('y_data',y_data.shape,'\n',y_data[:5])
         
-        input_dims = X_data.shape[1]
-        col_0 = InitialColumnProgNN(
-            input_dims=input_dims
-            , output_dims=1
-            , session=session
-            , dtype_X=tf.float32, dtype_y=tf.float32
-        )
-        col_0.add_fc(10,activation_func=tf.nn.relu)
-    #     col_0.add_fc(1024,activation_func=tf.nn.relu)
-        col_0.add_fc(1,activation_func=None
-            # ,output_layer=True
-            )
-        col_0.compile_nn(
-    #         loss=tf.reduce_mean(tf.reduce_sum(tf.square(col_0.ys - col_0.prediction),reduction_indices=[1]))
-            loss=tf.losses.mean_squared_error(col_0.ys,col_0.prediction)
-    #         ,opt=tf.train.AdamOptimizer(learning_rate=1e-3)
-            ,opt=tf.train.GradientDescentOptimizer(learning_rate=1e-1)
-    #         ,mectrics=[]
-        )
-        col_0.train(
-            X=X_data
-            , y=y_data
-            , batch_size=None
-            , n_epochs=1000
-            , display_steps=50
-        )
-        col_0.plt_loss()
+#         input_dims = X_data.shape[1]
+#         col_0 = InitialColumnProgNN(
+#             input_dims=input_dims
+#             , output_dims=1
+#             , session=session
+#             , dtype_X=tf.float32, dtype_y=tf.float32
+#         )
+#         col_0.add_fc(10,activation_func=tf.nn.relu)
+#     #     col_0.add_fc(1024,activation_func=tf.nn.relu)
+#         col_0.add_fc(1,activation_func=None
+#             # ,output_layer=True
+#             )
+#         col_0.compile_nn(
+#     #         loss=tf.reduce_mean(tf.reduce_sum(tf.square(col_0.ys - col_0.prediction),reduction_indices=[1]))
+#             loss=tf.losses.mean_squared_error(col_0.ys,col_0.prediction)
+#     #         ,opt=tf.train.AdamOptimizer(learning_rate=1e-3)
+#             ,opt=tf.train.GradientDescentOptimizer(learning_rate=1e-1)
+#     #         ,mectrics=[]
+#         )
+#         col_0.train(
+#             X=X_data
+#             , y=y_data
+#             , batch_size=None
+#             , n_epochs=1000
+#             , display_steps=50
+#         )
+#         col_0.plt_loss()
 
-    try_cls = True
-    if try_cls:
-        from tensorflow.examples.tutorials.mnist import input_data
+#     try_cls = True
+#     if try_cls:
+#         from tensorflow.examples.tutorials.mnist import input_data
 
-        mnist = input_data.read_data_sets("/tmp/data/", one_hot=True)
-        X_train = mnist.train.images#.astype(np.float64)
-        y_train = mnist.train.labels#.astype(np.float64)
-        X_val = mnist.validation.images
-        y_val = mnist.validation.labels
-        X_test = mnist.test.images
-        y_test = mnist.test.labels
-        check_obj('X_train')
-        check_obj('y_train')
-        input_dims = X_train.shape[1]
-        output_dims = y_train.shape[1]
-        check_obj('input_dims')
-        check_obj('output_dims')
-        col_cls_0 = InitialColumnProgNN(
-            input_dims=input_dims
-            , output_dims=output_dims
-            , session=session
-            , dtype_X=tf.float32
-            , dtype_y=tf.float32)
-        col_cls_0.add_fc(512,activation_func=tf.nn.relu)
-        col_cls_0.add_fc(256,activation_func=tf.nn.relu)
-        col_cls_0.add_fc(128,activation_func=tf.nn.relu)
-        col_cls_0.add_fc(output_dims,activation_func=tf.nn.softmax)
-        col_cls_0.compile_nn(
-            loss=tf.losses.softmax_cross_entropy(col_cls_0.ys,col_cls_0.logits)
-            , opt=tf.train.AdamOptimizer(learning_rate=1e-3)
-            , metrics = ['acc'])
-        col_cls_0.train(
-            X=X_train
-            ,y=y_train
-            ,val_set=[X_val,y_val]
-            ,batch_size=256
-            ,n_epochs=10
-            ,display_steps=100)
-        col_cls_0.plt_loss()
+#         mnist = input_data.read_data_sets("/tmp/data/", one_hot=True)
+#         X_train = mnist.train.images#.astype(np.float64)
+#         y_train = mnist.train.labels#.astype(np.float64)
+#         X_val = mnist.validation.images
+#         y_val = mnist.validation.labels
+#         X_test = mnist.test.images
+#         y_test = mnist.test.labels
+#         check_obj('X_train')
+#         check_obj('y_train')
+#         input_dims = X_train.shape[1]
+#         output_dims = y_train.shape[1]
+#         check_obj('input_dims')
+#         check_obj('output_dims')
+#         col_cls_0 = InitialColumnProgNN(
+#             input_dims=input_dims
+#             , output_dims=output_dims
+#             , session=session
+#             , dtype_X=tf.float32
+#             , dtype_y=tf.float32)
+#         col_cls_0.add_fc(512,activation_func=tf.nn.relu)
+#         col_cls_0.add_fc(256,activation_func=tf.nn.relu)
+#         col_cls_0.add_fc(128,activation_func=tf.nn.relu)
+#         col_cls_0.add_fc(output_dims,activation_func=tf.nn.softmax)
+#         col_cls_0.compile_nn(
+#             loss=tf.losses.softmax_cross_entropy(col_cls_0.ys,col_cls_0.logits)
+#             , opt=tf.train.AdamOptimizer(learning_rate=1e-3)
+#             , metrics = ['acc'])
+#         col_cls_0.train(
+#             X=X_train
+#             ,y=y_train
+#             ,val_set=[X_val,y_val]
+#             ,batch_size=256
+#             ,n_epochs=10
+#             ,display_steps=100)
+#         col_cls_0.plt_loss()
 
 
 
