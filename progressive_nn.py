@@ -7,6 +7,7 @@ import random
 import os
 # os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 import matplotlib.pyplot as plt
+from utils import *
 
 class InitialColumnProgNN(object):
 
@@ -129,14 +130,19 @@ class InitialColumnProgNN(object):
         
         self.session.run(tf.global_variables_initializer())
         
-    def train(self, X, y, n_epochs, batch_size=None, val_set=None, display_steps=50): 
+    def train(self, X, y, n_epochs, batch_size=None, val_set=None, display_steps=50, shuffle=True): 
         # data_valid:list
+        assert X.shape[0] == y.shape[0]
         n_samples = X.shape[0]
         if batch_size is None:
             batch_size = n_samples
         steps_per_epoch = int(n_samples/batch_size)
         counter = 0
         for epoch in range(1,n_epochs+1):
+            if shuffle:
+                order = np.random.permutation(n_samples)
+                X = X[order]
+                y = y[order]
             for step in range(0,steps_per_epoch): # n_sample=1000, batch_size=10, steps_per_epoch=100
                 if step != steps_per_epoch-1: # last step
                     X_batch = X[step*batch_size:(step+1)*batch_size]
@@ -229,8 +235,9 @@ class InitialColumnProgNN(object):
         else:
             for m_name in self.metrics:
                 plt.title('metrics:'+m_name)
-                plt.plot(self.his_metrics_train[m_name])
-                plt.plot(self.his_metrics_val[m_name])
+                plt.plot(self.his_metrics_train[m_name], label='training '+m_name)
+                plt.plot(self.his_metrics_val[m_name], label='validation '+m_name)
+                plt.legend()
                 plt.show()
 
 
