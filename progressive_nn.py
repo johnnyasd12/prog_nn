@@ -3,8 +3,10 @@ import numpy as np
 from pprint import pprint
 from param_collection import ParamCollection
 
+import random
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+import matplotlib.pyplot as plt
 
 class InitialColumnProgNN(object):
 
@@ -124,6 +126,10 @@ class InitialColumnProgNN(object):
         self.opt = opt
         self.train_op = self.opt.minimize(self.loss)
         self.metrics = metrics
+        if metrics is not None:
+            for m_name in metrics:
+                self.metrics_his_train[m_name] = []
+                self.metrics_his_val[m_name] = []
         self.pc = ParamCollection(self.session, self.params)
         
         self.session.run(tf.global_variables_initializer())
@@ -160,6 +166,7 @@ class InitialColumnProgNN(object):
                         m = self.get_metrics(X_batch, y_batch)
                         for m_name,m_value in m.items():
                             print(m_name,'=',m_value, end=' ')
+                            self.metrics_his_train[m_name].append(m_value)
 
                     if val_set is not None:
                         X_val = val_set[0]
@@ -172,9 +179,9 @@ class InitialColumnProgNN(object):
                             m_val = self.get_metrics(X_val,y_val)
                             for m_name,m_value in m_val.items():
                                 print('val',m_name,'=',m_value,end=' ')
-                        print()
-                    else:
-                        print()
+                                self.metrics_his_val[m_name].append(m_value)
+                    print()
+                    
                 counter += 1
                 
     
@@ -209,6 +216,13 @@ class InitialColumnProgNN(object):
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, self.dtype_X))
         result = self.session.run(accuracy, feed_dict={self.Xs: X, self.ys: y})
         return result
+    
+    def plt_loss(self):
+        loss_t = self.loss_his_train
+        loss_v = self.loss_his_val
+        plt.plot(loss_t)
+        plt.plot(loss_v)
+        plt.show()
 
 
 
@@ -283,6 +297,7 @@ if __name__ == "__main__":
             , n_epochs=1000
             , display_steps=50
         )
+        col_0.plt_loss()
 
     try_cls = True
     if try_cls:
@@ -319,9 +334,10 @@ if __name__ == "__main__":
             X=X_train
             ,y=y_train
             ,val_set=[X_val,y_val]
-            ,batch_size=32
+            ,batch_size=256
             ,n_epochs=10
             ,display_steps=100)
+        col_cls_0.plt_loss()
 
 
 
